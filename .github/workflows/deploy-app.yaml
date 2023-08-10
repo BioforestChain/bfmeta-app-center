@@ -1,0 +1,53 @@
+name: Deploy App
+
+# 接受api的触发
+#curl --location --request POST 'https://api.github.com/repos/MrSeaWave/lerna-demo/dispatches' \
+# --header 'Accept: application/vnd.github.v3+json' \
+# --header 'Authorization: Bearer 自定义的github token' \
+# --header 'Content-Type: application/json' \
+# --data-raw '{
+#     "event_type": "opened",
+#     "client_payload": { // 自定义的额外信息数据
+#        "app":"这里想传递一个zip文件",
+#        "metadata":"这是json文件"
+#     }
+# }'
+on: 
+  repository_dispatch:
+    types: [release]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Get app package
+      id: get_app
+      run: |
+        app_package=${{ github.event.client_payload.app }}  
+        # 从package参数中解析出名称 
+        app_name=${app_package##*/}
+        # 保存app名称为输出
+        echo "::set-output name=name::$app_name"
+
+    - name: Get metadata
+      id: get_metadata  
+      run: |
+        echo "::set-output name=metadata::${{ github.event.client_payload.metadata }}"
+
+    - name: Copy files to applications folder
+      run: |
+        echo ${{ steps.get_app.outputs.name }}
+        mkdir -p applications/${{ steps.get_app.outputs.name }}
+        cp ${{ steps.get_app.outputs.package }} applications/${{ steps.get_app.outputs.name }}/${{ steps.get_app.outputs.name }}.zip
+        cp ${{ steps.get_metadata.outputs.metadata }} applications/${{ steps.get_app.outputs.name }}/metadata.json
+
+
+    - name: Commit changes  
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add .
+        git commit -m "Deploy new app version"
+        git push
